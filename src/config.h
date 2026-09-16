@@ -21,7 +21,7 @@
 
 // ---------- Orientation (User-Wunsch: landscape, USB-Port seitlich) ----------
 // 0 = Portrait (natuerlich), 1 = 90° CW, 2 = 180°, 3 = 90° CCW
-#define DISPLAY_ROTATION 1
+#define DISPLAY_ROTATION 2
 
 // ---------- Power-Regeln ----------
 // GPIO17 = BAT_Control: MUSS HIGH vor Deep-Sleep-Entry, sonst wacht das
@@ -60,4 +60,4 @@
 // ---------- Timing ----------
 #define WIFI_TIMEOUT_MS   15000
 #define HTTP_TIMEOUT_MS   10000
-#define SLEEP_INTERVAL_MIN  10    // Deep-Sleep-Zyklus (Phase 3: adaptiv)
+#define SLEEP_INTERVAL_MIN  10   // Deep-Sleep-Zyklus (Phase 3: adaptiv)

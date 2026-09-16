@@ -60,7 +60,7 @@ static void go_to_sleep(void) {
     pwr_epd_on(false);
     pwr_audio_on(false);
     delay(20);
-    Serial.printf("[sleep] deep sleep, wake in %d min\r\n", SLEEP_INTERVAL_MIN);
+    Serial.printf("[sleep] cause=%d -> deep sleep %d min\r\n", (int)esp_sleep_get_wakeup_cause(), SLEEP_INTERVAL_MIN);
     Serial.flush();
     pwr_deep_sleep_now();
 }
@@ -68,7 +68,8 @@ static void go_to_sleep(void) {
 void setup() {
     Serial.begin(115200);
     delay(50);
-    Serial.println("\n[boot] epaper_dashboard v0.1");
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    Serial.printf("\n[boot] epaper_dashboard v0.1.1 (wake_cause=%d)\r\n", (int)esp_sleep_get_wakeup_cause());
 
     pwr_gpio_init();
     pwr_vbat_hold_dis();      // Hold vom letzten Sleep loesen (falls RTC-Domain)
@@ -78,7 +79,7 @@ void setup() {
 
     // agy-Review-Fix 4a: USB-Upload-Fenster beim Kaltstart (Power-On/USB-Reset).
     // Nach Deep-Sleep-Wakeup NICHT warten (Akku!), nur beim echten Power-On.
-    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    if (cause == ESP_SLEEP_WAKEUP_UNDEFINED) {
         Serial.println("[boot] Kaltstart - 3s Upload-Fenster");
         delay(3000);
     }
@@ -86,8 +87,10 @@ void setup() {
     epd_init_and_show();      // erst Display (schnelles Feedback am Geraet)
 
     bool wifi_ok = net_wifi_connect();
+    Serial.printf("[net] wifi_ok=%d\r\n", wifi_ok);
     if (wifi_ok) {
         have_net_data = net_fetch_status(data);
+        Serial.printf("[net] fetch_ok=%d (generated=%s)\r\n", have_net_data, data.generated);
         net_wifi_off();
     }
     if (have_net_data) strlcpy(last_seen, data.generated, sizeof(last_seen));
@@ -103,11 +106,12 @@ void setup() {
     }
     epd_push_frame();
 
-    // agy-Review-Fix 4b: Warten, bis alle EXT1-Pins HIGH (Tasten gelöst) -
-    // sonst wacht der Deep Sleep sofort wieder auf (Akku-Killer).
+    // agy-Review-Fix 4b: Warten, bis BOOT/PWR-Buttons HIGH (Tasten gelöst) -
+    // ohne EXT1-Wake ist das kein Sofort-Wake-Risiko mehr, aber ein
+    // versehentlich gedrückter Button beim Ablegen soll nicht stören.
     const uint32_t btn_wait_t0 = millis();
-    while ((digitalRead(BOOT_BTN_PIN) == LOW || digitalRead(PWR_BTN_PIN) == LOW
-            || digitalRead(GPIO_NUM_5) == LOW) && millis() - btn_wait_t0 < 5000) {
+    while ((digitalRead(BOOT_BTN_PIN) == LOW || digitalRead(PWR_BTN_PIN) == LOW)
+           && millis() - btn_wait_t0 < 2000) {
         delay(10);
     }
 

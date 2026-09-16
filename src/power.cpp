@@ -9,6 +9,7 @@
  * sie explizit: RTC-GPIO-Init -> Output-HIGH -> hold im Sleep.
  */
 #include <Arduino.h>
+#include <Wire.h>
 #include "power.h"
 #include "config.h"
 
@@ -28,6 +29,15 @@ void pwr_gpio_init(void) {
     io.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io.pull_up_en = GPIO_PULLUP_DISABLE;
     ESP_ERROR_CHECK(gpio_config(&io));
+
+    // PCF85063-INT-Flags loeschen (Demo-FW hinterliess evtl. aktiven
+    // RTC-Alarm -> INT(GPIO5) haengt LOW). Control_2 (0x01) auf 0x00.
+    // I2C hier manuell, da Wire noch nicht gebunden ist:
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.beginTransmission(PCF85063_ADDR);
+    Wire.write(0x01);
+    Wire.write(0x00);
+    Wire.endTransmission();
 }
 
 void pwr_epd_on(bool on)  { gpio_set_level((gpio_num_t)EPD_PWR_PIN, on ? 0 : 1); }
@@ -35,13 +45,14 @@ void pwr_audio_on(bool on) { gpio_set_level((gpio_num_t)AUDIO_PWR_PIN, on ? 0 : 
 
 void pwr_vbat_hold_high_for_sleep(void) {
     // GPIO17 in den RTC-Domain bringen, HIGH treiben und im Sleep halten.
+    // Waveshare-Referenz-Stil: rtc_gpio_hold_en reicht (sleep-direction
+    // raus - im Verdacht, den RTC-Timer-Wake zu blockieren, 16.9.).
     const gpio_num_t pin = (gpio_num_t)VBAT_PWR_PIN;
-    rtc_gpio_init(pin);                                              // als RTC-GPIO uebernehmen
+    rtc_gpio_init(pin);
     rtc_gpio_set_direction(pin, RTC_GPIO_MODE_OUTPUT_ONLY);
     rtc_gpio_set_level(pin, 1);                                      // HIGH = BAT_Control aktiv
     rtc_gpio_pullup_en(pin);
     rtc_gpio_pulldown_dis(pin);
-    rtc_gpio_set_direction_in_sleep(pin, RTC_GPIO_MODE_OUTPUT_ONLY); // im Sleep weiter HIGH treiben
     rtc_gpio_hold_en(pin);                                           // Latch bis Aufwachen
 }
 
@@ -50,11 +61,13 @@ void pwr_vbat_hold_dis(void) {
     gpio_hold_dis((gpio_num_t)VBAT_PWR_PIN);
 }
 
-// Wake-Quellen: RTC-Timer (Zyklus) + EXT1 (BOOT 0 / PWR 18 / RTC-INT 5, LOW)
+// Wake-Quellen: NUR Timer (Phase 1). EXT1 (BOOT/PWR/RTC-INT) deaktiviert:
+// GPIO5 = PCF85063-INT ist Open-Drain OHNE Sicherstellung des Pullups im
+// Sleep - haengt er LOW (alter RTC-Alarm der Demo-FW), wake'd der Chip
+// sofort wieder (Boot-Loop, 19.9.-Diagnose). Buttons mit sauberem
+// rtc_gpio-Pull-Setup kommen in Phase 3 zurueck.
 void pwr_enable_wakeup_sources(void) {
     ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL));
-    const uint64_t mask = (1ULL << BOOT_BTN_PIN) | (1ULL << PWR_BTN_PIN) | (1ULL << GPIO_NUM_5);
-    ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW));
 }
 
 void pwr_deep_sleep_now(void) {
@@ -62,6 +75,9 @@ void pwr_deep_sleep_now(void) {
     // 1. BAT_Control HIGH + RTC-Hold  2. Wake-Quellen  3. Schlaf
     pwr_vbat_hold_high_for_sleep();
     pwr_enable_wakeup_sources();
+    Serial.println("[sleep] entering deep sleep NOW");
+    Serial.flush();
+    delay(50);
     esp_deep_sleep_start();
 }
 
