@@ -17,16 +17,18 @@
 
 extern epaper_driver_display *driver;
 
-// Panel-Koordinaten aus User-Koordinaten je nach DISPLAY_ROTATION
+// Panel-Koordinaten aus User-Koordinaten je nach DISPLAY_ROTATION.
+// 19.9.-Fix: Alte Formeln ROT1/ROT3 produzierten gespiegelte Zeichen
+// (Achsen-Matrix falsch herum) - korrigiert per rot_sim.py-Beweis:
 static inline void map_xy(uint16_t ux, uint16_t uy, uint16_t &px, uint16_t &py) {
 #if DISPLAY_ROTATION == 0          // Portrait
     px = ux; py = uy;
-#elif DISPLAY_ROTATION == 1        // 90° CW (USB-Port links)
-    px = uy; py = (EPD_HEIGHT - 1) - ux;
+#elif DISPLAY_ROTATION == 1        // 90° CW
+    px = (EPD_HEIGHT - 1) - uy; py = ux;
 #elif DISPLAY_ROTATION == 2        // 180°
     px = (EPD_WIDTH - 1) - ux; py = (EPD_HEIGHT - 1) - uy;
-#else                              // 90° CCW (USB-Port rechts)
-    px = (EPD_WIDTH - 1) - uy; py = ux;
+#else                              // 90° CCW
+    px = uy; py = (EPD_WIDTH - 1) - ux;
 #endif
 }
 
@@ -41,13 +43,16 @@ void disp_clear(uint8_t color) {
 }
 
 // 5x7 Bitmap-Font (ASCII 32..126), Tabelle in font5x7.h (PROGMEM).
+// FONT-FORMAT: 5 Bytes = 5 Spalten, LSB-first (Bit0 = Zeile 0 = OBEN).
+// 19.9.-Fix: Vorher MSB-first gelesen (0x80>>row) -> Zeichen vertikal
+// gespiegelt ("unlesbar"-Bug-Fundament).
 void disp_draw_char(uint16_t ux, uint16_t uy, char c, uint8_t color) {
     if (c < 32 || c > 126) c = '?';
     uint8_t idx = c - 32;
     for (uint8_t col = 0; col < 5; col++) {
         uint8_t bits = pgm_read_byte(&font5x7[idx][col]);
         for (uint8_t row = 0; row < 7; row++) {
-            if (bits & (0x80 >> row))
+            if (bits & (0x01 << row))
                 disp_draw_pixel(ux + col, uy + row, color);
         }
     }
