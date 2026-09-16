@@ -13,6 +13,7 @@
  * - Flashen NUR auf User-Kommando (harte RLCD-Regel)
  */
 #include <Arduino.h>
+#include "esp_sleep.h"
 #include "config.h"
 #include "net.h"
 #include "ui.h"
@@ -75,6 +76,13 @@ void setup() {
     pinMode(VBAT_PWR_PIN, OUTPUT);
     digitalWrite(VBAT_PWR_PIN, HIGH);
 
+    // agy-Review-Fix 4a: USB-Upload-Fenster beim Kaltstart (Power-On/USB-Reset).
+    // Nach Deep-Sleep-Wakeup NICHT warten (Akku!), nur beim echten Power-On.
+    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
+        Serial.println("[boot] Kaltstart - 3s Upload-Fenster");
+        delay(3000);
+    }
+
     epd_init_and_show();      // erst Display (schnelles Feedback am Geraet)
 
     bool wifi_ok = net_wifi_connect();
@@ -94,6 +102,14 @@ void setup() {
         ui_render_offline(batt_pct, last_seen);
     }
     epd_push_frame();
+
+    // agy-Review-Fix 4b: Warten, bis alle EXT1-Pins HIGH (Tasten gelöst) -
+    // sonst wacht der Deep Sleep sofort wieder auf (Akku-Killer).
+    const uint32_t btn_wait_t0 = millis();
+    while ((digitalRead(BOOT_BTN_PIN) == LOW || digitalRead(PWR_BTN_PIN) == LOW
+            || digitalRead(GPIO_NUM_5) == LOW) && millis() - btn_wait_t0 < 5000) {
+        delay(10);
+    }
 
     go_to_sleep();
 }
