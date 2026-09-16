@@ -17,6 +17,7 @@
 #include "config.h"
 #include "net.h"
 #include "ui.h"
+#include "display.h"
 #include "power.h"
 #include "sensors.h"
 
@@ -98,6 +99,28 @@ void setup() {
     sensors_init();
     sensors_read_shtc3(&shtc_t, &shtc_h);
     batt_pct = pwr_battery_percent();
+
+#if ORIENTATION_TEST
+    // Orientierungs-Testbild: 4 Punktmuster an den User-Ecken + großes
+    // F mittig. Ein Foto liefert Montage-Richtung + Mirror-Beweis.
+    {
+        disp_clear(COL_WHITE);
+        // Ecke 1 (user 5,5): 1 Punkt;  Ecke 2 (user 194,5): 2 Punkte;
+        // Ecke 3 (user 5,194): 3 Punkte; Ecke 4 (user 194,194): 4 Punkte
+        for (int i = 0; i < 1; i++) for (int j = 0; j < 1; j++) disp_draw_pixel(5 + i, 5 + j, COL_BLACK);
+        for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++) disp_draw_pixel(190 + i, 5 + j, COL_BLACK);
+        for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) disp_draw_pixel(5 + i, 190 + j, COL_BLACK);
+        for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) disp_draw_pixel(190 + i, 190 + j, COL_BLACK);
+        // Grosses F (scale 6: 36x42 px) mittig
+        disp_draw_text(70, 76, "F", COL_BLACK, 6);
+        disp_draw_text(20, 30, "TOP", COL_BLACK, 2);
+        disp_draw_text(20, 170, "BOTTOM", COL_BLACK, 1);
+        epd_push_frame();
+        Serial.println("[orient] Testbild gezeichnet");
+        delay(60000);   // 60 s sichtbar halten, dann schlafen
+        go_to_sleep();
+    }
+#endif
 
     if (have_net_data) {
         ui_render(data, batt_pct, wifi_ok, shtc_t, shtc_h);

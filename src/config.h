@@ -23,6 +23,11 @@
 // 0 = Portrait (natuerlich), 1 = 90° CW, 2 = 180°, 3 = 90° CCW
 #define DISPLAY_ROTATION 3
 
+// ---------- Orientierungs-Test (1 = Testbild statt Dashboard) ----------
+// Grosses F in der Mitte + Eckpunkte (1/2/3/4 Punkte). Ein Foto davon
+// liefert die exakte Panel-Montage-Richtung + evtl. Treiber-Mirror.
+#define ORIENTATION_TEST 0
+
 // ---------- Power-Regeln ----------
 // GPIO17 = BAT_Control: MUSS HIGH vor Deep-Sleep-Entry, sonst wacht das
 // Board im Akkubetrieb NIE wieder auf (Amazon-Rezension, HW-verifiziert).
