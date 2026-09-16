@@ -21,7 +21,7 @@
 
 // ---------- Orientation (User-Wunsch: landscape, USB-Port seitlich) ----------
 // 0 = Portrait (natuerlich), 1 = 90° CW, 2 = 180°, 3 = 90° CCW
-#define DISPLAY_ROTATION 2
+#define DISPLAY_ROTATION 3
 
 // ---------- Power-Regeln ----------
 // GPIO17 = BAT_Control: MUSS HIGH vor Deep-Sleep-Entry, sonst wacht das
